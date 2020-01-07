@@ -51,7 +51,18 @@ import org.bouncycastle.util.io.Streams;
  */
 public class PGPEnctryptionService implements EncryptionService {
 
-    private static void decryptFile(
+    private static final String BC_PROVIDER = "BC";
+
+    /**
+     *
+     * @param inputFileName Fifhcero
+     * @param keyFileName Clave privada
+     * @param passwd CONTRASEÑA
+     * @param defaultFileName Fichero salida
+     * @throws IOException
+     * @throws NoSuchProviderException
+     */
+    public static void decryptFile(
             String inputFileName,
             String keyFileName,
             char[] passwd,
@@ -62,6 +73,30 @@ public class PGPEnctryptionService implements EncryptionService {
         decryptFile(in, keyIn, passwd, defaultFileName);
         keyIn.close();
         in.close();
+    }
+
+    /**
+     *
+     * @param outputFileName
+     * @param inputFileName
+     * @param encKeyFileName
+     * @param armor
+     * @param withIntegrityCheck
+     * @throws IOException
+     * @throws NoSuchProviderException
+     * @throws PGPException
+     */
+    public static void encryptFile(
+            String outputFileName,
+            String inputFileName,
+            String encKeyFileName,
+            boolean armor,
+            boolean withIntegrityCheck)
+            throws IOException, NoSuchProviderException, PGPException {
+        OutputStream out = new BufferedOutputStream(new FileOutputStream(outputFileName));
+        PGPPublicKey encKey = readPublicKey(encKeyFileName);
+        encryptFile(out, inputFileName, encKey, armor, withIntegrityCheck);
+        out.close();
     }
 
     /**
@@ -108,7 +143,7 @@ public class PGPEnctryptionService implements EncryptionService {
                 throw new IllegalArgumentException("secret key for message not found.");
             }
 
-            InputStream clear = pbe.getDataStream(new JcePublicKeyDataDecryptorFactoryBuilder().setProvider("BC").build(sKey));
+            InputStream clear = pbe.getDataStream(new JcePublicKeyDataDecryptorFactoryBuilder().setProvider(BC_PROVIDER).build(sKey));
 
             JcaPGPObjectFactory plainFact = new JcaPGPObjectFactory(clear);
 
@@ -124,13 +159,13 @@ public class PGPEnctryptionService implements EncryptionService {
             if (message instanceof PGPLiteralData) {
                 PGPLiteralData ld = (PGPLiteralData) message;
 
-                String outFileName = ld.getFileName();
+                /*String outFileName = ld.getFileName();
                 if (outFileName.length() == 0) {
                     outFileName = defaultFileName;
-                }
+                }*/
 
                 InputStream unc = ld.getInputStream();
-                OutputStream fOut = new BufferedOutputStream(new FileOutputStream(outFileName));
+                OutputStream fOut = new BufferedOutputStream(new FileOutputStream(defaultFileName));
 
                 Streams.pipeAll(unc, fOut);
 
@@ -141,7 +176,7 @@ public class PGPEnctryptionService implements EncryptionService {
                 throw new PGPException("message is not a simple encrypted file - type unknown.");
             }
 
-            if (pbe.isIntegrityProtected()) {
+            /*if (pbe.isIntegrityProtected()) {
                 if (!pbe.verify()) {
                     System.err.println("message failed integrity check");
                 } else {
@@ -149,7 +184,7 @@ public class PGPEnctryptionService implements EncryptionService {
                 }
             } else {
                 System.err.println("no message integrity check");
-            }
+            }*/
         } catch (PGPException e) {
             System.err.println(e);
             if (e.getUnderlyingException() != null) {
@@ -158,29 +193,7 @@ public class PGPEnctryptionService implements EncryptionService {
         }
     }
 
-    /**
-     *
-     * @param outputFileName
-     * @param inputFileName
-     * @param encKeyFileName
-     * @param armor
-     * @param withIntegrityCheck
-     * @throws IOException
-     * @throws NoSuchProviderException
-     * @throws PGPException
-     */
-    public static void encryptFile(
-            String outputFileName,
-            String inputFileName,
-            String encKeyFileName,
-            boolean armor,
-            boolean withIntegrityCheck)
-            throws IOException, NoSuchProviderException, PGPException {
-        OutputStream out = new BufferedOutputStream(new FileOutputStream(outputFileName));
-        PGPPublicKey encKey = readPublicKey(encKeyFileName);
-        encryptFile(out, inputFileName, encKey, armor, withIntegrityCheck);
-        out.close();
-    }
+
 
     private static void encryptFile(
             OutputStream out,
@@ -193,19 +206,19 @@ public class PGPEnctryptionService implements EncryptionService {
             out = new ArmoredOutputStream(out);
         }
 
-        // if provider is not present, add it
+        /*// if provider is not present, add it
         if (Security.getProvider(BouncyCastleProvider.PROVIDER_NAME) == null) {
             // insert at specific position
             Security.insertProviderAt(new BouncyCastleProvider(), 1);
-        }
+        }*/
 
         try {
             byte[] bytes = compressFile(fileName, CompressionAlgorithmTags.ZIP);
 
             PGPEncryptedDataGenerator encGen = new PGPEncryptedDataGenerator(
-                    new JcePGPDataEncryptorBuilder(PGPEncryptedData.CAST5).setWithIntegrityPacket(withIntegrityCheck).setSecureRandom(new SecureRandom()).setProvider("BC"));
+                    new JcePGPDataEncryptorBuilder(PGPEncryptedData.CAST5).setWithIntegrityPacket(withIntegrityCheck).setSecureRandom(new SecureRandom()).setProvider(BC_PROVIDER));
 
-            encGen.addMethod(new JcePublicKeyKeyEncryptionMethodGenerator(encKey).setProvider("BC"));
+            encGen.addMethod(new JcePublicKeyKeyEncryptionMethodGenerator(encKey).setProvider(BC_PROVIDER));
 
             OutputStream cOut = encGen.open(out, bytes.length);
 
@@ -251,7 +264,7 @@ public class PGPEnctryptionService implements EncryptionService {
             return null;
         }
 
-        return pgpSecKey.extractPrivateKey(new JcePBESecretKeyDecryptorBuilder().setProvider("BC").build(pass));
+        return pgpSecKey.extractPrivateKey(new JcePBESecretKeyDecryptorBuilder().setProvider(BC_PROVIDER).build(pass));
     }
 
     static PGPPublicKey readPublicKey(String fileName) throws IOException, PGPException {
